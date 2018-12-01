@@ -24,7 +24,7 @@ git clone https://github.com/crystallabs/slapd-viper
 3. While the server is running, load example data into the tree:
 
 ```sh
-ldapadd -x -D cn=admin,dc=example,dc=com -w nevairbe -v -c -f slapd-viper/ldifs/example.ldif
+ldapadd -x -D cn=admin,dc=example,dc=com -w nevairbe -c -f slapd-viper/ldifs/example.ldif
 ```
 
 4. And query the added data:
