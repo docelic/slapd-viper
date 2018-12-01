@@ -1,52 +1,18 @@
 package Viper;
-$Viper::VERSION= '.1p640'; # Sat Aug 22 18:37:13 CEST 2009
-#
 # vim: se ts=2 sts=2 sw=2 ai
 #
 # Viper -- Custom Perl backend for use with the OpenLDAP server.
 #
-# Spinlock Solutions --
-#   Advanced GNU/Linux networks in commercial and education sectors.
-#
-# Copyright 2008-2009 SPINLOCK d.o.o., http://www.spinlocksolutions.com/
-#                     Davor Ocelic, docelic@spinlocksolutions.com
-#
-# http://www.spinlocksolutions.com/
-# http://techpubs.spinlocksolutions.com/
-#
-# Released under GPL v3 or later.
+# Davor Ocelic <docelic@crystallabs.io>
+# Crystal Labs, https://crystallabs.io/
+# Released under GPL v3.
 #
 # The Viper backend implements regular LDAP functionality and can be used in
 # general-purpose LDAP scenarios where you want quick results on a platform
-# that already has extra features (default entries, query rewriting, dynamic
-# values, etc.), and also lends itself to further custom functionality.
+# that comes with extra features (default entries, query rewriting, dynamic
+# values, etc.), and also lends itself to further customization.
 #
-# However, it's main role is serving as the backend for automatic system
-# installations and configurations, where the clients are Debian-based
-# systems retrieving configuration data using HTTP preseeding, Debconf and
-# its LDAP driver, and in a final stage Puppet.
-# A whole set of features has been implemented specifically for this purpose.
-#
-# Viper homepage: http://www.spinlocksolutions.com/viper/
-# Git repository: http://www.github.com/docelic/Viper/
-# Mailing list:   https://lists.hcoop.net/listinfo/viper-users
-#
-# Quick look at configuring a suffix using Viper backend:
-# (shown is a minimal setup, without any interesting or Viper-specific
-# features. For full configuration options, see Viper documentation)
-#
-# modulepath  /usr/lib/ldap
-# moduleload  back_perl
-# 
-# database        perl
-# suffix          "dc=spinlock,dc=hr"
-# perlModulePath  "/etc/ldap/viper/"
-# perlModule      "Viper"
-# directory       "/var/lib/ldap/viper"
-#
-# # If needed:
-# rootdn          cn=admin,dc=spinlock,dc=hr
-# rootpw          nevairbe
+# Smallest working configuration can be seen in etc/ldap/slapd.conf.
 #
 
 use strict;
@@ -58,7 +24,7 @@ use Net::LDAP::Constant qw/LDAP_SUCCESS LDAP_PARAM_ERROR LDAP_OPERATIONS_ERROR/;
 use Net::LDAP::Constant qw/LDAP_ALREADY_EXISTS LDAP_NO_SUCH_OBJECT LDAP_OTHER/;
 use Net::LDAP::Constant qw/LDAP_INVALID_SYNTAX LDAP_INVALID_DN_SYNTAX/;
 use Net::LDAP::Constant qw/LDAP_NOT_ALLOWED_ON_NONLEAF LDAP_FILTER_ERROR/;
-use Net::LDAP::Constant qw/LDAP_INVALID_CREDENTIALS/;
+use Net::LDAP::Constant qw/LDAP_INVALID_CREDENTIALS LDAP_UNWILLING_TO_PERFORM/;
 use Net::LDAP::Constant qw/LDAP_TIMELIMIT_EXCEEDED LDAP_SIZELIMIT_EXCEEDED/;
 use Net::LDAP::LDIF     qw//;
 use Net::LDAP::Schema   qw//;
@@ -252,6 +218,8 @@ sub new {
 		cacheread      => '',      # Num-ops cache validity (dn2leaf disk reads)
 
 		'start'        => [],      # Time of search start (array ID= search level)
+
+		'allow_bind'   => 0,       # Allow bind? (Our implementation is limited)
 	};
 
 	# Must be done here as schema parser already has to be present
@@ -353,13 +321,22 @@ sub init {
 
 
 # Called to verify bind credentials.
+#
 # Note that if rootdn and rootpw are set in slapd.conf, and you try to
 # authenticate as rootdn, slapd will perform the password check itself,
 # and will not call this function.
-# If you're authenticating as something other than rootdn OR rootpw is
-# not set, then this function will be called as you'd expect.
+#
+# Also, if you authenticate as a user belonging to some other part of DIT,
+# that backend's bind() will be called, not this one.
+#
+# Also, if you authenticate via e.g. GSSAPI, this won't be called.
+#
+# Finally, due to limited implementation of this function, we default to
+# simply not allowing it, unless allow_bind is enabled.
 sub bind {
 	my( $this, $dn, $pw)= @_;
+
+	return LDAP_UNWILLING_TO_PERFORM unless $this->{allow_bind};
 
 	$this->normalize( \$dn);
 
