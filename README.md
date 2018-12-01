@@ -61,8 +61,506 @@ Dynamic functions possible with `slapd-viper` are:
 1. Attribute values can evaluate Perl code
 1. Returned entries can be appened with additional attributes or values in various ways
 
+## Configuration Reference
 
-## LDAP Operations
+Each database configured to use Viper should begin with the following block:
+
+```
+database           perl
+suffix             "SUFFIX"
+perlModulePath     "/etc/ldap/slapd-viper"
+perlModule         "Viper"
+
+directory          "/var/lib/ldap/viper/"
+treesuffix         "SUFFIX"
+```
+
+The first four lines are required by slapd and its back-perl backend
+to configure the suffix and initialize Viper.
+
+The last two lines are required by the Viper backend. The value of
+`treesufix` must be equal to 'suffix'. (This small duplication cannot
+be avoided because `suffix` directive is consumed by `slapd` and is not
+passed onto our backend).
+
+### Directives
+
+After the above standard lines, the following directives can be used. The list is
+sorted alphabetically, with each caption specifying configuration directive
+name and its usage syntax. Where applicable, the first value listed
+indicates the default value.
+
+#### addIgnoredups 0|1
+
+Specify whether LDAP ADD operation should ignore adds on existing entries
+without throwing LDAP_ALREADY_EXISTS error. Applicable if `addoverwrites` is 0.
+
+#### addOverwrites 0|1
+
+Specify whether LDAP ADD operation should overwrite existing entries,
+without throwing LDAP_ALREADY_EXISTS error.
+
+#### cacheRead SPEC
+
+Specify how (and how long) to cache LDIF reads from disk. No specification
+implies no cache.
+
+SPEC can be a pure number (implies seconds), or a time specification such as 5s,
+10m, 2h, 2d, 1w for seconds, minutes, hours, days and weeks respectively.
+
+It can also be a number of value uses, such as 20u, and number of LDAP operations, 20o.
+("Number of uses" is not a value directly known to the admin, and should rarely, if ever, be used.)
+
+Overall best value, one that minimizes or eliminates the risk of
+serving stale data while still reaching a noticeable optimization
+(up to 25%), is 1 operation, specified as 1o.
+
+NOTE: due to deficiencies in Memoize::Expire module, time- and
+uses-based methods of expiry do not work correctly when caching non-scalar
+values (such as multiple values for an attribute). It is therefore suggested
+to always use the number-of-operations cache (like 1o).
+
+CacheRead and 'overlayConfig' cache can be used separately, or together,
+amplifying the effect.
+
+Example: `cacheRead 1o`
+
+#### clean
+
+Invoke removal of all saved stack files from disk.
+
+#### deleteTrees 1|0
+
+Specify whether Viper should allow deleting non-leaf elements (deleting
+the entry and everything under it in one go).
+
+Whether subtree delete is requested or not can be controlled with
+ldapdelete option -r, but `back-perl` does not pass that option onto the
+backend, so the client-side option is not honored, and `deleteTrees` is the
+single decision maker.
+
+#### entryAppend ATTRIBUTE PATTERN -&gt; &lt;attr ATTRIBUTE [ATTRATTR [ATTR...]] | append PATTERN REPLACEMENT [ATTR...]&gt;
+
+Specify entryAppend rule, allowing adding extra attributes into an entry
+before returning it to the client.
+
+When all ATTRIBUTE PATTERN pairs match, Viper looks to append the entry with
+a set of default attributes.
+
+The entry from which to read the default attributes to append can be specified in two
+ways.
+
+1. With "attr ATTRIBUTE" (usually "attr seeAlso"). In that case,
+the attribute `seeAlso` is looked up in the current entry. It is expected
+to contain the DN of the entry whose attributes should append the current entry.
+
+If ATTRATTR and ATTRs are unspecified, the entry is appended with
+all allowed attributes. Otherwise, it is appended only with attributes
+listed in the ATTRATTR attribute within the entry and/or in the literal
+list of ATTRs.
+
+2. With "append PATTERN REPLACEMENT", where s/PATTERN/REPLACEMENT/ is
+performed on the original DN, and the result is used as the entry from which
+to pull the extra attributes.
+
+With the 'append' method, there is no ATTRATTR field, so you cannot append
+the entry with the values of attributes listed in the entry, but you do
+have the option of specifying ATTRs to append with.
+
+If left unspecified, the entry is appended with all allowed attributes.
+
+Examples from production config:
+
+```
+entryAppend  objectClass "^dhcpHost$"                      \
+             -&gt;                                            \
+             append .+ cn=dhcpHost,ou=objectClasses,ou=defaults
+
+entryAppend  objectClass "^dhcpSubnet$"                    \
+             -&gt;                                            \
+             append .+ cn=dhcpSubnet,ou=objectClasses,ou=defaults
+
+entryAppend  dn          "^cn=default,ou=networks"         \
+             objectClass "^ipNetwork$"                     \
+             -&gt;                                            \
+             attr seeAlso
+```
+
+#### exp MATCH_REGEX NON_MATCH_REGEX
+
+Specify regexes that each entry DN must and must not match respectively, to have
+overlay "exp" run on its attributes.
+
+The "exp" overlay enables expansion into values of other attributes, in the
+current or other entry.
+
+Example which always matches, and so enables the `exp` overlay: `exp  .   ^$`
+
+#### extension EXT
+
+Specify file extension to use when storing server data on disk.
+
+Viper's data is kept in a directory tree that corresponds to the LDAP
+tree, where DN components are directories, and leaf nodes are files.
+Each file contains one LDAP entry in LDIF format.
+
+File extension must be specified to make directories distinguishable
+from files, and the default value should rarely be changed.
+
+Default: `.ldif`
+
+#### file MATCH_REGEX NON_MATCH_REGEX
+
+Specify regexes that each entry DN must and must not match respectively, to have
+overlay "file" run on its attributes.
+
+The "file" overlay enables expansion into values of on-disk files, always
+relative to the suffix base directory.
+
+Example: `file  .   ^$`
+
+#### find MATCH_REGEX NON_MATCH_REGEX
+
+Specify regexes that each entry DN must and must not match respectively, to have
+overlay "find" run on its attributes.
+
+The "find" overlay enables internal re-invocation of the search function, 
+and using the values retrieved in constructing the original value.
+
+This overlay shares many similarities with "exp", but contains a crucial
+difference -- with "exp", you generally know where the entry and attribute
+to expand to are located. With "find", you generally don't, so you perform
+a search to find them.
+
+Example: `find  .   ^$`
+
+#### load FILE [PATTERN REPLACEMENT ...]
+
+Load and process configuration stack from FILE.
+FILE is always relative to suffix base directory.
+
+To ease writing slapd.conf configuration, Viper supports saving
+stacks of configuration values to disk.
+
+Once saved, the stack can be loaded by subsequently-defined suffixes to
+import configuration blocks.
+
+It is possible to specify a list of PATTERN/REPLACEMENTs that
+are applied to every line loaded before it is sent to the config
+processor.
+
+Also, stacks may contain variables that will expand to proper values
+in the context of each suffix that is using them.
+(Not particularly important, but note that this will happen in the
+config processor call, not during PATTERN/REPLACEMENT preprocessing.)
+
+Example: `load default_opts`
+
+#### message TEXT
+
+Print TEXT to the log. The log will be a console if slapd is started
+with option -d (such as -d 256) to run in the foreground.
+
+Example: `message Test`
+
+#### modifyCopyOnWrite 1|0
+
+When a MODIFY request is issued for an entry that does not really exist 
+(i.e. it comes from a fallback), specify whether Viper should copy the
+entry to the expected location and then modify it, or return
+LDAP_NO_SUCH_OBJECT.
+
+#### modifySmarts 1|0
+
+Specify whether Viper should ignore MODIFY requests that do not result
+in any real change within the entry.
+
+Debconf's LDAP driver submits all questions loaded during a session as
+modifications, regardless of whether their value has changed.
+
+ModifySmarts was primarily added to help Viper deal with unnecessary MODIFY
+requests to entries that contain dynamic values, but since that functionality
+has been improved and completed, this directive lost its initial
+relevance.
+
+However, it is still useful to enable it, detect "no-op" modifications and
+avoid writing to disk, preserving meaningful modification timestamps.
+
+#### overlayConfig OVERLAY OPTION VALUE ...
+
+Specify default overlay options.
+
+OVERLAY can be an overlay name (perl, exp, file, find) or "default".
+
+OPTION can be "cache", "prefix" or "if".
+
+	cache SPEC - specify cache expiry time.
+
+	Caching overlay results improves performance enormously in situations
+	where multiple entries are returned and all produce the same dynamic
+	values for certain attributes.
+
+	In such cases, operations of complexity O(n) are reduced to O(1) level.
+
+	Syntax is the same as listed under "cacheRead", and 1o is again the
+	overall best setting.
+
+	NOTE: due to deficiencies in Memoize::Expire module, time- and
+	uses-based methods of expiry do not work correctly when caching non-scalar
+	values (such as multiple values for an attribute). It is therefore suggested
+	to always use the number-of-operations cache (like 1o).
+
+	Example: cache 1o
+
+	prefix PREFIX - generic prefix option, used where applicable. Currently
+	only the "file" overlay honors it, where it is a prefix to prepend on
+	all file specifications.
+
+	Directory separator is not added automatically,
+	so to prefix with a directory, include "/" at the end.
+
+	Example: prefix subdir/
+
+#### parseVariables 1|0
+
+Specify whether in the directives that follow, variable and directive expansion
+should be performed.
+
+
+This includes expanding ${variable} to variable values and %{directive} to
+configuration directive values.
+
+
+#### perl MATCH_REGEX NON_MATCH_REGEX
+
+Specify regexes that each entry DN must and must not match respectively, to have
+overlay "perl" run on its attributes.
+
+
+By default, Perl overlay is disabled as it is in fact an interface for
+"eval", and is considered dangerous. To activate it, open Viper.pm and
+enable constant PERLEVAL.
+
+
+Example: `perl  .   ^$`
+
+
+#### save FILE
+
+Save current stack to FILE, always relative to suffix base directory.
+
+
+To ease writing slapd.conf configuration, Viper supports saving
+stacks of configuration values to disk.
+
+
+Once saved, the stack can be loaded by subsequently-defined suffixes to
+import configuration blocks.
+
+
+Stacks may contain variables that expand to proper values in the context
+of each suffix that is using them.
+
+
+Stack and dump functions itself are not part of the stack, so they do
+not end up saved or loaded from stack files. They need to be specified
+explicitly in each suffix that wants to use them.
+
+
+Example: `save default_opts`
+
+
+#### searchFallback PATTERN REPLACEMENT
+
+Specify search fallback rule, effectively implementing default entries.
+
+
+When a specific search base is requested, and it does not exist in the searched
+location, it is possible to fallback to a chain of default entries. The first
+entry found wins.
+
+
+Examples: production examples defaulting to site-wide and global defaults
+
+```
+# Fallback 1: site defaults tree.
+searchFallback  cn=.[^,\\s]+,ou=hosts         ou=hosts,ou=defaults
+searchFallback  cn=.[^,\\s]+,ou=templates     ou=templates,ou=defaults
+
+# Fallback 2: global defaults tree.
+searchFallback  cn=.[^,\\s]+,ou=hosts,.+      ou=hosts,ou=defaults
+searchFallback  cn=.[^,\\s]+,ou=templates,.+  ou=templates,ou=defaults
+```
+
+#### searchSubst KEY PATTERN ... -&gt; KEY PATTERN REPLACEMENT ...
+
+Specify searchSubst rule, allowing rewrite of any part of the search
+request.
+
+When the incoming search request matches all KEY PATTERN pairs, Viper
+performs the specified KEY=~ s/PATTERN/REPLACEMENT/ actions to rewrite
+the incoming search.
+
+
+Search rewriting is completely free-form, and it is possible to rewrite searches to a completely different Viper suffix, as long as both are located in the same base directory.
+
+
+This is a legitimate feature of the rewrite model, and is officially used to
+rewrite incoming DHCP search queries under ou=dhcp to appropriate places
+and with appropriate options under ou=clients.
+
+
+KEY can be one of base, scope, deref, size, time, filter, attrOnly. Rewriting
+one last element of a search, the list of attributes to return, is currently
+not possible, but the feature is on the way.
+
+
+Examples: production examples used in rewriting ou=dhcp to ou=clients
+
+```
+Example 1:
+
+# Solve lack of flexibility in ISC DHCP3 LDAP patch by
+# plainly specifying ldap-base-dn "ou=dhcp" in DHCP's
+# config, and then here, rewriting DHCP ethernet address
+# lookup to the ou=clients tree under which all clients
+# are defined.
+
+searchSubst  base        "^ou=dhcp$"                       \
+             filter      "^\\(&\\(objectClass=dhcpHost\\)\\(dhcpHWAddress=ethernet [\\dabcdef:]+\\)\\)$" \
+             -&gt;                                            \
+             base   .+   ou=clients
+
+
+Example 2:
+
+# Solve lack of flexibility in ISC DHCP3 LDAP patch by
+# rewriting a search in any shared network, tree
+# ou=dhcp, to a proper location,
+
+searchSubst  base        "^ou=\\w+,ou=dhcp$"                \
+             scope       "^1$"                             \
+             filter      "^\\(objectClass=\\*\\)$"         \
+             -&gt;                                            \
+             base   .+   "ou=clients"                      \
+             filter .+   "(&amp;(objectClass=dhcpSubnet)(!(cn=default)))" \
+             scope  .+   2
+```
+
+
+#### schemaFatal 0|1
+
+Specify whether a missing or inaccessible schemaLDIF file should trigger
+a fatal error.
+
+
+It is vital for Viper to be aware of server's schema (which comes from
+the schemaLDIF file). The server surely won't work properly if the schema
+file in LDIF format is missing, or is not up to date with the server's schema.
+
+
+However, we issue a warning and allow startup without it, because you are
+then expected to use <i>scripts/schema.pl</i> to connect to the
+server right away and obtain the schema in LDIF format, saving it to the
+expected location. Then, restart the server to pick it up.
+
+
+The default setup as installed by <i>scripts/viper-setup.sh</i> includes
+all the schema files and the schema.ldif that is in sync with them, so
+it is not necessary to create or sync the file manually.
+
+
+SchemaFatal value should probably set to 1 only when you're sure you do
+have the schema.ldif file, and that its inexistence in your setup is a
+sure indication of an error.
+
+
+#### schemaLDIF FILE
+
+Specify location of server's schema in a single file, in LDIF format.
+
+
+Viper must be aware of server's schema, but back-perl does not pass that
+information onto the backend. The way to produce it then is to first run
+the server without it, then use <i>scripts/schema.pl</i> to obtain the
+schema and save it to the expected location, then re-start the
+server with <i>invoke-rc.d slapd restart</i>.
+
+
+Directive "schemaFatal" specifies whether Viper should allow starting
+up without the schema LDIF file in place.
+
+
+Note that the schema in LDIF format does not eliminate the need to have the
+real schema files in /etc/ldap/schema/*.schema. Schema files are read by
+slapd, and schema LDIF file is read by Viper. LDIF is created on the 
+basis of real schema files, and at all times, slapd and Viper should
+have their schemas in sync.
+
+
+This means you need to sync schema LDIF file to the actual server's schema
+every
+time you make a change to any of the /etc/ldap/schema/*.schema files,
+most probably by re-running <i>scripts/schema.pl</i> and restarting
+the server. Unless Viper schema is up to date, LDAP results may be be subtly
+incorrect and error basically impossible to trace (unless you remember it
+may be a stale schema file).
+
+
+Example: `schemaLDIF /etc/ldap/schema/schema.ldif`
+
+
+
+#### var VARIABLE "VALUE STRING"
+
+Assign "VALUE STRING" to variable VARIABLE. Variables, in this context,
+are visible only within the suffix where they are defined, and their value
+is expanded with ${variable}, if option "parseVariables" is enabled.
+
+
+#### loadDump FILE
+ THIS IS A DEBUG OPTION 
+
+Load direct Perl Storable dump of configuration hash from FILE, always
+relative to the suffix base directory.
+
+
+This is an advanced option that should not be called from slapd.conf.
+
+
+It is intended for scenarios where Viper is at least once initialized by slapd
+(and configured via slapd.conf), and config then dumped as Storable object
+using saveDump.
+
+
+After that, you can run Viper "standalone", directly under the Perl
+interpreter using <i>scripts/viper.pl</i>, and instead of re-parsing
+slapd.conf for configuration, simply send "loadDump FILE" to the config
+processor, to load the exact state as had by slapd/Viper.
+
+
+This is almost always needed only when you want to run Viper under the Perl
+interpreter directly, to specify Perl debug or profiling options.
+
+
+#### saveDump FILE
+ THIS IS A DEBUG OPTION 
+
+Save direct Perl Storable dump of configuration hash to FILE, always
+relative to the suffix base directory.
+
+
+This is an advanced option that should usually be called as the last
+line of slapd.conf configuration for a particular suffix.
+
+
+This is almost always needed only when you want to run Viper under the Perl
+interpreter directly, to specify Perl debug or profiling options.
+
+
+
+## LDAP Operations - Notes
 
 1. BIND operation is supported, but only in a trivial way. Therefore, binding using a DN under this part of DIT is not enabled by default unless `enable_bind 1` is present in the config file.
 
+1. DELETE operation works, but does not receive an indication whether subtree delete was requested or not. Therefore, currently the way to control whether a DELETE will delete whole subtrees or refuse to work on non-leaf values is controlled using the config option `deleteTrees`.
