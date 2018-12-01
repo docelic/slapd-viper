@@ -1,0 +1,24 @@
+# Patch for a bug in Net::LDAP's FilterMatch.pm module.
+#
+# Patch is probably obsolete since the bug was fixed many years ago.
+#
+# Check if the bug applies to you or not:
+# http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=540938
+#
+# If yes, apply this patch.
+#
+# Davor Ocelic <docelic@crystallabs.io>
+# Crystal Labs, https://crystallabs.io/
+# Released under GPL v3.
+
+/usr/share/perl5/Net/LDAP/FilterMatch.pm
+--- /usr/share/perl5/Net/LDAP/FilterMatch.pm.old        2009-08-10 19:05:15.000000000 +0200
++++ /usr/share/perl5/Net/LDAP/FilterMatch.pm    2009-08-10 19:05:39.000000000 +0200
+@@ -245,7 +245,7 @@
+   my $regex=shift;
+   my $op=shift;
+   return 1 if ($regex =~ /^$/);
+-  return grep(/\Q$regex\E/i, @_) ? 1 : 0;
++  return grep(/$regex/i, @_) ? 1 : 0;
+ }
+
