@@ -161,6 +161,10 @@ from files, and the default value should rarely be changed.
 Load and process configuration stack from FILE.
 FILE is always relative to suffix base directory.
 
+If list of PATTERN REPLACEMENTS is specified, the s/PATTERN/REPLACEMENT/
+substitution is done on all loaded lines before sending them to the
+config processor.
+
 Example: `load default_opts`
 
 ##### message TEXT
@@ -188,7 +192,7 @@ on existing entries.
 
 ##### parseVariables 1|0
 
-Specify whether in the directives that follow, variable and directive expansion
+Specify whether in the lines that follow, variable and directive expansion
 should be performed.
 
 This includes expanding ${variable} to variable values and %{directive} to
@@ -206,7 +210,7 @@ Specify whether a missing or inaccessible schemaLDIF file should trigger
 a fatal error.
 
 It is vital for Viper to be aware of server's schema (which comes from
-the schemaLDIF file). The server surely won't work properly if the schema
+the `schemaLDIF` config option). The server won't work optimally if the schema
 file in LDIF format is missing, or is not up to date with the server's schema.
 
 However, we issue a warning and allow startup without it, because you are
@@ -214,40 +218,22 @@ then expected to use <i>scripts/schema.pl</i> to connect to the
 server right away and obtain the schema in LDIF format, saving it to the
 expected location. Then, restart the server to pick it up.
 
-The default setup as installed by <i>scripts/viper-setup.sh</i> includes
-all the schema files and the schema.ldif that is in sync with them, so
-it is not necessary to create or sync the file manually.
+This must be done because the server's schema is not available to `slapd-perl`.
 
-SchemaFatal value should probably set to 1 only when you're sure you do
-have the schema.ldif file, and that its inexistence in your setup is a
-sure indication of an error.
+`schemaFatal` value should be set to 1 when you are sure you do
+have the `schema.ldif` file in the correct location.
 
 ##### schemaLDIF FILE
 
 Specify location of server's schema in a single file, in LDIF format.
 
-Viper must be aware of server's schema, but back-perl does not pass that
-information onto the backend. The way to produce it then is to first run
-the server without it, then use <i>scripts/schema.pl</i> to obtain the
-schema and save it to the expected location, then re-start the
-server with <i>invoke-rc.d slapd restart</i>.
-
-Directive "schemaFatal" specifies whether Viper should allow starting
-up without the schema LDIF file in place.
+See the previous option for more info.
 
 Note that the schema in LDIF format does not eliminate the need to have the
-real schema files in /etc/ldap/schema/*.schema. Schema files are read by
+real schema files in `/etc/ldap/schema/*.schema`. Schema files are read by
 slapd, and schema LDIF file is read by Viper. LDIF is created on the 
 basis of real schema files, and at all times, slapd and Viper should
 have their schemas in sync.
-
-This means you need to sync schema LDIF file to the actual server's schema
-every
-time you make a change to any of the /etc/ldap/schema/*.schema files,
-most probably by re-running <i>scripts/schema.pl</i> and restarting
-the server. Unless Viper schema is up to date, LDAP results may be be subtly
-incorrect and error basically impossible to trace (unless you remember it
-may be a stale schema file).
 
 Example: `schemaLDIF /etc/ldap/schema/schema.ldif`
 
@@ -255,39 +241,7 @@ Example: `schemaLDIF /etc/ldap/schema/schema.ldif`
 
 Assign "VALUE STRING" to variable VARIABLE. Variables, in this context,
 are visible only within the suffix where they are defined, and their value
-is expanded with ${variable}, if option "parseVariables" is enabled.
-
-##### loadDump FILE
- THIS IS A DEBUG OPTION 
-
-Load direct Perl Storable dump of configuration hash from FILE, always
-relative to the suffix base directory.
-
-This is an advanced option that should not be called from slapd.conf.
-
-It is intended for scenarios where Viper is at least once initialized by slapd
-(and configured via slapd.conf), and config then dumped as Storable object
-using saveDump.
-
-After that, you can run Viper "standalone", directly under the Perl
-interpreter using <i>scripts/viper.pl</i>, and instead of re-parsing
-slapd.conf for configuration, simply send "loadDump FILE" to the config
-processor, to load the exact state as had by slapd/Viper.
-
-This is almost always needed only when you want to run Viper under the Perl
-interpreter directly, to specify Perl debug or profiling options.
-
-##### saveDump FILE
- THIS IS A DEBUG OPTION 
-
-Save direct Perl Storable dump of configuration hash to FILE, always
-relative to the suffix base directory.
-
-This is an advanced option that should usually be called as the last
-line of slapd.conf configuration for a particular suffix.
-
-This is almost always needed only when you want to run Viper under the Perl
-interpreter directly, to specify Perl debug or profiling options.
+is expanded with ${variable} if option "parseVariables" is enabled.
 
 #### Complex Configuration Directives
 
@@ -373,6 +327,27 @@ a search to find them.
 
 Example: `find  .   ^$`
 
+##### loadDump FILE
+
+THIS IS A DEBUG OPTION .
+
+Load direct Perl Storable dump of configuration hash from FILE, always
+relative to the suffix base directory.
+
+This is an advanced option that should not be called from slapd.conf.
+
+It is intended for scenarios where Viper is at least once initialized by slapd
+(and configured via slapd.conf), and config then dumped as Storable object
+using saveDump.
+
+After that, you can run Viper "standalone", directly under the Perl
+interpreter using <i>scripts/viper.pl</i>, and instead of re-parsing
+slapd.conf for configuration, simply send "loadDump FILE" to the config
+processor, to load the exact state as had by slapd/Viper.
+
+This is almost always needed only when you want to run Viper under the Perl
+interpreter directly, to specify Perl debug or profiling options.
+
 ##### overlayConfig OVERLAY OPTION VALUE ...
 
 Specify default overlay options.
@@ -418,6 +393,19 @@ By default, Perl overlay is disabled as it is in fact an interface for
 enable constant PERLEVAL.
 
 Example: `perl  .   ^$`
+
+##### saveDump FILE
+
+THIS IS A DEBUG OPTION .
+
+Save direct Perl Storable dump of configuration hash to FILE, always
+relative to the suffix base directory.
+
+This is an advanced option that should usually be called as the last
+line of slapd.conf configuration for a particular suffix.
+
+This is almost always needed only when you want to run Viper under the Perl
+interpreter directly, to specify Perl debug or profiling options.
 
 ##### searchFallback PATTERN REPLACEMENT
 
