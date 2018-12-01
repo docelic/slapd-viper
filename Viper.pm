@@ -2756,10 +2756,8 @@ sub ovl_options {
 sub parse_cache_opt {
 	my( $this, $ovl, $n)= @_;
 
-	return if not defined $n; # XXX no errmsg report here
-	return if $n== 0; # Skip if person cancelled cache
+	return if not $n;
 
-	# XXX stupid msg after only one type of cache now exists
 	pcd "Parsed cache validity '$n' for ovl $ovl";
 
 	# Create queue if it doesn't exist yet.

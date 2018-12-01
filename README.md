@@ -109,31 +109,19 @@ without throwing LDAP_ALREADY_EXISTS error.
 
 ##### cacheRead SPEC
 
-Specify how (and how long) to cache LDIF reads from disk. No specification implies no cache.
+Specify for how many LDAP operations to cache LDIF reads from disk.
+No specification implies no cache.
 
 SPEC can be:
 
 ```
-Xo   - X LDAP operations. Recommended
-
-X    - implies X seconds. Not recommended for use
-Xs   - X seconds. Not recommended for use
-Xm   - X minutes. Not recommended for use
-Xh   - X hours. Not recommended for use
-Xd   - X days. Not recommended for use
-Xw   - X weeks. Not recommended for use
-Xu   - X uses. Not recommended for use
+X    - X LDAP operations
 ```
 
 Overall best value, which minimizes risk of serving stale data while reaching
-noticeable optimization improvement (up to 25%), is 1 operation, specified as `1o`.
+noticeable optimization improvement (up to 25%), is 1 operation, specified as `1`.
 
 `cacheRead` and `overlayConfig` cache can be used together, amplifying the effect.
-
-NOTE: due to deficiencies in Memoize::Expire module, time- and
-uses-based methods of expiry do not work correctly when caching non-scalar
-values (such as multiple values for an attribute). It is therefore suggested
-to always use the number-of-operations cache.
 
 ##### clean
 
