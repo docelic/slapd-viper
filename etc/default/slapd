@@ -1,0 +1,7 @@
+# Add this to /etc/default/slapd only if you receive an error about
+# slapd being unable to start the Perl backend due to missing libperl:
+
+export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libperl.so.5.24
+
+# NOTE: Find the exact pathname which needs to be added with command:
+# find /usr/lib/ -name 'libperl.*'

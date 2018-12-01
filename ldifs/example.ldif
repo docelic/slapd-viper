@@ -1,0 +1,38 @@
+dn: dc=example,dc=com
+objectClass: domain
+objectClass: dcObject
+dc: example
+
+
+dn: ou=users,dc=example,dc=com
+ou: users
+objectClass: organizationalUnit
+
+dn: ou=groups,dc=example,dc=com
+objectClass: organizationalUnit
+ou: groups
+
+dn: ou=hosts,dc=example,dc=com
+objectClass: organizationalUnit
+ou: hosts
+
+
+dn: cn=testuser,ou=groups,dc=example,dc=com
+objectClass: posixGroup
+cn: testuser
+gidNumber: 12000
+
+dn: uid=testuser,ou=users,dc=example,dc=com
+objectClass: person
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: posixAccount
+uid: testuser
+homeDirectory: /home/testuser
+uidNumber: 12000
+gidNumber: 12000
+loginShell: /bin/bash
+cn: Test User
+sn: User
+givenName: Test
+userPassword: test
