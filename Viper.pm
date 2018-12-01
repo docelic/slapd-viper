@@ -65,7 +65,7 @@ use Net::LDAP::Schema   qw//;
 use Net::LDAP::Filter   qw//;
 use Net::LDAP::FilterMatch qw//;
 use Storable            qw/freeze nstore retrieve/;
-use File::Path          qw/rmtree/;
+use File::Path          qw/rmtree mkpath/;
 use Fcntl               qw/:flock/;
 use Net::LDAP           qw//;
 use Text::CSV_XS        qw//;
@@ -281,8 +281,6 @@ sub init {
 	# Now ensure that the root of the configured tree exists. To do that,
 	# all we need to do is create the components on the way to final
 	# component.
-	# Actually, for now, just verify the paths are there, if not, throw
-	# warning.
 
 	my $dn= $this->{treesuffix};
 
@@ -292,7 +290,7 @@ sub init {
 
 	# Note: this return doesn't bail out on File not found because dn2leaf
 	# is called with namesonly param, so no actual checking is done.
-	$ret= $this->dn2leaf( "$dn", \%ret, qw/namesonly 1/);
+	$ret= $this->dn2leaf( "$dn", \%ret, qw/namesonly 1 leaf 0 writeop 1 create 1/);
 	return $ret unless $ret== LDAP_SUCCESS;
 
 	# Note: $dn=~ check is here to avoid the error message on 
@@ -604,7 +602,7 @@ sub config {
 			$this->{tmpdir}= join '/', $this->{directory}, 'tmp';
 
 			if( ! -e $this->{tmpdir} or ! -d $this->{tmpdir}) {
-				unless( mkdir $this->{tmpdir}) {
+				unless( mkpath $this->{tmpdir}) {
 					warn "Can't mkdir '$this->{tmpdir}' ($!)\n";
 					return LDAP_OPERATIONS_ERROR
 				}
@@ -1754,6 +1752,7 @@ sub dn2leaf {
 		entry    => 0, # Return Net::LDAP::Entry?
 		verify   => 0, # Verify that fs path components exists. Ret '' if not.
 		namesonly=> 0, # Return leaf name and parent dir name of an entry.
+		create   => 0, # Create all missing paths (use rarely!)
 		# Add caller options to our default set
 		%opts
 	);
@@ -1806,6 +1805,14 @@ sub dn2leaf {
 
 	# Important that this rewinds $currdir to the right place and does
 	# the right things if we're going for any filesystem work besides reading.
+	#
+	# Here, we only create missing directories if the LDIF leafs otherwise
+	# already exist.
+	#
+	# As one exception to this rule, we also create the LDIF leafs along the
+	# whole path if 'create' is true. Typically, this should only be true when
+	# calling this method from init() and creating the basic path up to the
+	# configured suffix on which we don't have global superior knowledge.
 	if( $opts{writeop}) {
 		my $currdir= $this->{directory};
 		my @i= @paths;
@@ -1815,8 +1822,12 @@ sub dn2leaf {
 			my $currfile= $currdir . $this->{extension};
 
 			if( ! -r $currfile) {
-				p "DN2LEAF: -r '$currfile': $!\n";
-				return LDAP_NO_SUCH_OBJECT
+				if( $opts{create}) {
+					$this->save($comp, '');
+				} else {
+					p "DN2LEAF: -r '$currfile': $!\n";
+					return LDAP_NO_SUCH_OBJECT
+				}
 
 			# We could create dir along with .ldif file on every ADD, but that would
 			# leave us with empty dirs for all leaf entries. So to avoid that, we
@@ -2254,8 +2265,8 @@ sub read_file {
 }
 
 # Function to write file on disk, taking into account proper
-# steps, locking and error messages. (Writing regular files, for
-# LDIF data see save() below)
+# steps, locking and error messages. (This is for writing regular
+# files; for writing LDIF data see save() below)
 sub write_file {
 	my( $this, $directory, $file, $data)= @_;
 
