@@ -94,7 +94,7 @@ directive name and its usage syntax.
 
 Where applicable, the first value listed indicates the default value.
 
-#### Simple Directives
+#### Simple Configuration Directives
 
 ##### addIgnoredups 0|1
 
@@ -127,14 +127,12 @@ Xu   - X uses. Not recommended for use
 Overall best value, which minimizes risk of serving stale data while reaching
 noticeable optimization improvement (up to 25%), is 1 operation, specified as `1o`.
 
+`cacheRead` and `overlayConfig` cache can be used together, amplifying the effect.
+
 NOTE: due to deficiencies in Memoize::Expire module, time- and
 uses-based methods of expiry do not work correctly when caching non-scalar
 values (such as multiple values for an attribute). It is therefore suggested
 to always use the number-of-operations cache.
-
-`cacheRead` and `overlayConfig` cache can be used together, amplifying the effect.
-
-Example: `cacheRead 1o`
 
 ##### clean
 
@@ -147,63 +145,6 @@ the entry and everything under it in one go).
 
 See notes for DELETE under "LDAP Operations - Notes".
 
-##### entryAppend ATTRIBUTE PATTERN ... -&gt; attr ATTRIBUTE [ATTRATTR [ATTR...]]
-##### entryAppend ATTRIBUTE PATTERN ... -&gt; append PATTERN REPLACEMENT [ATTR...]
-
-Specify an `entryAppend` rule, allowing adding extra attributes into an entry
-before returning it to the client.
-
-When all ATTRIBUTE-PATTERN pairs match, Viper looks to append the entry with
-a set of default attributes.
-
-The entry from which to import the attributes can be specified in two ways:
-
-1. With "attr ATTRIBUTE" (usually "attr seeAlso"). In that case,
-the attribute `seeAlso` is looked up in the current entry. It is expected
-to contain the DN of the entry whose attributes should append the current entry.
-
-If ATTRATTR and ATTRs are unspecified, the entry is appended with
-all allowed attributes. Otherwise, it is appended only with attributes
-listed in the ATTRATTR attribute within the entry and/or in the literal
-list of ATTRs.
-
-2. With "append PATTERN REPLACEMENT", where s/PATTERN/REPLACEMENT/ is
-performed on the original DN, and the result is used as the entry from which
-to pull the extra attributes.
-
-With the 'append' method, there is no ATTRATTR field, so you cannot append
-the entry with the values of attributes listed in the entry, but you do
-have the option of specifying ATTRs to append with.
-
-If left unspecified, the entry is appended with all allowed attributes.
-
-Examples from production config:
-
-```
-entryAppend  objectClass "^dhcpHost$"                      \
-             ->                                            \
-             append .+ cn=dhcpHost,ou=objectClasses,ou=defaults
-
-entryAppend  objectClass "^dhcpSubnet$"                    \
-             ->                                            \
-             append .+ cn=dhcpSubnet,ou=objectClasses,ou=defaults
-
-entryAppend  dn          "^cn=default,ou=networks"         \
-             objectClass "^ipNetwork$"                     \
-             ->                                            \
-             attr seeAlso
-```
-
-##### exp MATCH_REGEX NON_MATCH_REGEX
-
-Specify regexes that each entry DN must and must not match respectively, to have
-overlay "exp" run on its attributes.
-
-The "exp" overlay enables expansion into values of other attributes, in the
-current or other entry.
-
-Example which always matches, and so enables the `exp` overlay: `exp  .   ^$`
-
 ##### extension .ldif
 
 Specify file extension to use when storing server data on disk.
@@ -214,31 +155,6 @@ Each file contains one LDAP entry in LDIF format.
 
 File extension must be specified to make directories distinguishable
 from files, and the default value should rarely be changed.
-
-##### file MATCH_REGEX NON_MATCH_REGEX
-
-Specify regexes that each entry DN must and must not match respectively, to have
-overlay "file" run on its attributes.
-
-The "file" overlay enables expansion into values of on-disk files, always
-relative to the suffix base directory.
-
-Example: `file  .   ^$`
-
-##### find MATCH_REGEX NON_MATCH_REGEX
-
-Specify regexes that each entry DN must and must not match respectively, to have
-overlay "find" run on its attributes.
-
-The "find" overlay enables internal re-invocation of the search function, 
-and using the values retrieved in constructing the original value.
-
-This overlay shares many similarities with "exp", but contains a crucial
-difference -- with "exp", you generally know where the entry and attribute
-to expand to are located. With "find", you generally don't, so you perform
-a search to find them.
-
-Example: `find  .   ^$`
 
 ##### load FILE [PATTERN REPLACEMENT ...]
 
@@ -266,51 +182,9 @@ LDAP_NO_SUCH_OBJECT.
 Specify whether Viper should ignore MODIFY requests that do not result
 in any real change within the entry.
 
-Debconf's LDAP driver submits all questions loaded during a session as
-modifications, regardless of whether their value has changed.
-
-ModifySmarts was primarily added to help Viper deal with unnecessary MODIFY
-requests to entries that contain dynamic values, but since that functionality
-has been improved and completed, this directive lost its initial
-relevance.
-
-However, it is still useful to enable it, detect "no-op" modifications and
-avoid writing to disk, preserving meaningful modification timestamps.
-
-##### overlayConfig OVERLAY OPTION VALUE ...
-
-Specify default overlay options.
-
-OVERLAY can be an overlay name (perl, exp, file, find) or "default".
-
-OPTION can be "cache", "prefix" or "if".
-
-	cache SPEC - specify cache expiry time.
-
-	Caching overlay results improves performance enormously in situations
-	where multiple entries are returned and all produce the same dynamic
-	values for certain attributes.
-
-	In such cases, operations of complexity O(n) are reduced to O(1) level.
-
-	Syntax is the same as listed under "cacheRead", and 1o is again the
-	overall best setting.
-
-	NOTE: due to deficiencies in Memoize::Expire module, time- and
-	uses-based methods of expiry do not work correctly when caching non-scalar
-	values (such as multiple values for an attribute). It is therefore suggested
-	to always use the number-of-operations cache (like 1o).
-
-	Example: cache 1o
-
-	prefix PREFIX - generic prefix option, used where applicable. Currently
-	only the "file" overlay honors it, where it is a prefix to prepend on
-	all file specifications.
-
-	Directory separator is not added automatically,
-	so to prefix with a directory, include "/" at the end.
-
-	Example: prefix subdir/
+This is useful to enable to detect "no-op" modifications and
+avoid writing to disk, preserving meaningful modification timestamps
+on existing entries.
 
 ##### parseVariables 1|0
 
@@ -320,94 +194,11 @@ should be performed.
 This includes expanding ${variable} to variable values and %{directive} to
 configuration directive values.
 
-##### perl MATCH_REGEX NON_MATCH_REGEX
-
-Specify regexes that each entry DN must and must not match respectively, to have
-overlay "perl" run on its attributes.
-
-By default, Perl overlay is disabled as it is in fact an interface for
-"eval", and is considered dangerous. To activate it, open Viper.pm and
-enable constant PERLEVAL.
-
-Example: `perl  .   ^$`
-
 ##### save FILE
 
 Save current stack to FILE, always relative to suffix base directory.
 
 Example: `save default_opts`
-
-##### searchFallback PATTERN REPLACEMENT
-
-Specify search fallback rule, effectively implementing default entries.
-
-When a specific search base is requested, and it does not exist in the searched
-location, it is possible to fallback to a chain of default entries. The first
-entry found wins.
-
-Examples: production examples defaulting to site-wide and global defaults
-
-```
-# Fallback 1: site defaults tree.
-searchFallback  cn=.[^,\\s]+,ou=hosts         ou=hosts,ou=defaults
-searchFallback  cn=.[^,\\s]+,ou=templates     ou=templates,ou=defaults
-
-# Fallback 2: global defaults tree.
-searchFallback  cn=.[^,\\s]+,ou=hosts,.+      ou=hosts,ou=defaults
-searchFallback  cn=.[^,\\s]+,ou=templates,.+  ou=templates,ou=defaults
-```
-
-##### searchSubst KEY PATTERN ... -&gt; KEY PATTERN REPLACEMENT ...
-
-Specify searchSubst rule, allowing rewrite of any part of the search
-request.
-
-When the incoming search request matches all KEY PATTERN pairs, Viper
-performs the specified KEY=~ s/PATTERN/REPLACEMENT/ actions to rewrite
-the incoming search.
-
-Search rewriting is completely free-form, and it is possible to rewrite searches to a completely different Viper suffix, as long as both are located in the same base directory.
-
-This is a legitimate feature of the rewrite model, and is officially used to
-rewrite incoming DHCP search queries under ou=dhcp to appropriate places
-and with appropriate options under ou=clients.
-
-KEY can be one of base, scope, deref, size, time, filter, attrOnly. Rewriting
-one last element of a search, the list of attributes to return, is currently
-not possible, but the feature is on the way.
-
-Examples: production examples used in rewriting ou=dhcp to ou=clients
-
-```
-Example 1:
-
-# Solve lack of flexibility in ISC DHCP3 LDAP patch by
-# plainly specifying ldap-base-dn "ou=dhcp" in DHCP's
-# config, and then here, rewriting DHCP ethernet address
-# lookup to the ou=clients tree under which all clients
-# are defined.
-
-searchSubst  base        "^ou=dhcp$"                       \
-             filter      "^\\(&\\(objectClass=dhcpHost\\)\\(dhcpHWAddress=ethernet [\\dabcdef:]+\\)\\)$" \
-             -&gt;                                            \
-             base   .+   ou=clients
-
-
-Example 2:
-
-# Solve lack of flexibility in ISC DHCP3 LDAP patch by
-# rewriting a search in any shared network, tree
-# ou=dhcp, to a proper location,
-
-searchSubst  base        "^ou=\\w+,ou=dhcp$"                \
-             scope       "^1$"                             \
-             filter      "^\\(objectClass=\\*\\)$"         \
-             -&gt;                                            \
-             base   .+   "ou=clients"                      \
-             filter .+   "(&amp;(objectClass=dhcpSubnet)(!(cn=default)))" \
-             scope  .+   2
-```
-
 
 ##### schemaFatal 0|1
 
@@ -497,6 +288,208 @@ line of slapd.conf configuration for a particular suffix.
 
 This is almost always needed only when you want to run Viper under the Perl
 interpreter directly, to specify Perl debug or profiling options.
+
+#### Complex Configuration Directives
+
+##### entryAppend ATTRIBUTE PATTERN ... -&gt; attr ATTRIBUTE [ATTRATTR [ATTR...]]
+##### entryAppend ATTRIBUTE PATTERN ... -&gt; append PATTERN REPLACEMENT [ATTR...]
+
+Specify an `entryAppend` rule, allowing adding extra attributes into an entry
+before returning it to the client.
+
+When all ATTRIBUTE-PATTERN pairs match, Viper looks to append the entry with
+a set of default attributes.
+
+The entry from which to import the attributes can be specified in two ways:
+
+1. With "attr ATTRIBUTE" (usually "attr seeAlso"). In that case,
+the attribute `seeAlso` is looked up in the current entry. It is expected
+to contain the DN of the entry whose attributes should append the current entry.
+
+If ATTRATTR and ATTRs are unspecified, the entry is appended with
+all allowed attributes. Otherwise, it is appended only with attributes
+listed in the ATTRATTR attribute within the entry and/or in the literal
+list of ATTRs.
+
+2. With "append PATTERN REPLACEMENT", where s/PATTERN/REPLACEMENT/ is
+performed on the original DN, and the result is used as the entry from which
+to pull the extra attributes.
+
+With the 'append' method, there is no ATTRATTR field, so you cannot append
+the entry with the values of attributes listed in the entry, but you do
+have the option of specifying ATTRs to append with.
+
+If left unspecified, the entry is appended with all allowed attributes.
+
+Examples from production config:
+
+```
+entryAppend  objectClass "^dhcpHost$"                      \
+             ->                                            \
+             append .+ cn=dhcpHost,ou=objectClasses,ou=defaults
+
+entryAppend  objectClass "^dhcpSubnet$"                    \
+             ->                                            \
+             append .+ cn=dhcpSubnet,ou=objectClasses,ou=defaults
+
+entryAppend  dn          "^cn=default,ou=networks"         \
+             objectClass "^ipNetwork$"                     \
+             ->                                            \
+             attr seeAlso
+```
+
+##### exp MATCH_REGEX NON_MATCH_REGEX
+
+Specify regexes that each entry DN must and must not match respectively, to have
+overlay "exp" run on its attributes.
+
+The "exp" overlay enables expansion into values of other attributes, in the
+current or other entry.
+
+Example which always matches, and so enables the `exp` overlay: `exp  .   ^$`
+
+##### file MATCH_REGEX NON_MATCH_REGEX
+
+Specify regexes that each entry DN must and must not match respectively, to have
+overlay "file" run on its attributes.
+
+The "file" overlay enables expansion into values of on-disk files, always
+relative to the suffix base directory.
+
+Example: `file  .   ^$`
+
+##### find MATCH_REGEX NON_MATCH_REGEX
+
+Specify regexes that each entry DN must and must not match respectively, to have
+overlay "find" run on its attributes.
+
+The "find" overlay enables internal re-invocation of the search function, 
+and using the values retrieved in constructing the original value.
+
+This overlay shares many similarities with "exp", but contains a crucial
+difference -- with "exp", you generally know where the entry and attribute
+to expand to are located. With "find", you generally don't, so you perform
+a search to find them.
+
+Example: `find  .   ^$`
+
+##### overlayConfig OVERLAY OPTION VALUE ...
+
+Specify default overlay options.
+
+OVERLAY can be an overlay name (perl, exp, file, find) or "default".
+
+OPTION can be "cache", "prefix" or "if".
+
+	cache SPEC - specify cache expiry time.
+
+	Caching overlay results improves performance enormously in situations
+	where multiple entries are returned and all produce the same dynamic
+	values for certain attributes.
+
+	In such cases, operations of complexity O(n) are reduced to O(1) level.
+
+	Syntax is the same as listed under "cacheRead", and 1o is again the
+	overall best setting.
+
+	NOTE: due to deficiencies in Memoize::Expire module, time- and
+	uses-based methods of expiry do not work correctly when caching non-scalar
+	values (such as multiple values for an attribute). It is therefore suggested
+	to always use the number-of-operations cache (like 1o).
+
+	Example: cache 1o
+
+	prefix PREFIX - generic prefix option, used where applicable. Currently
+	only the "file" overlay honors it, where it is a prefix to prepend on
+	all file specifications.
+
+	Directory separator is not added automatically,
+	so to prefix with a directory, include "/" at the end.
+
+	Example: prefix subdir/
+
+##### perl MATCH_REGEX NON_MATCH_REGEX
+
+Specify regexes that each entry DN must and must not match respectively, to have
+overlay "perl" run on its attributes.
+
+By default, Perl overlay is disabled as it is in fact an interface for
+"eval", and is considered dangerous. To activate it, open Viper.pm and
+enable constant PERLEVAL.
+
+Example: `perl  .   ^$`
+
+##### searchFallback PATTERN REPLACEMENT
+
+Specify search fallback rule, effectively implementing default entries.
+
+When a specific search base is requested, and it does not exist in the searched
+location, it is possible to fallback to a chain of default entries. The first
+entry found wins.
+
+Examples: production examples defaulting to site-wide and global defaults
+
+```
+# Fallback 1: site defaults tree.
+searchFallback  cn=.[^,\\s]+,ou=hosts         ou=hosts,ou=defaults
+searchFallback  cn=.[^,\\s]+,ou=templates     ou=templates,ou=defaults
+
+# Fallback 2: global defaults tree.
+searchFallback  cn=.[^,\\s]+,ou=hosts,.+      ou=hosts,ou=defaults
+searchFallback  cn=.[^,\\s]+,ou=templates,.+  ou=templates,ou=defaults
+```
+
+##### searchSubst KEY PATTERN ... -&gt; KEY PATTERN REPLACEMENT ...
+
+Specify searchSubst rule, allowing rewrite of any part of the search
+request.
+
+When the incoming search request matches all KEY PATTERN pairs, Viper
+performs the specified KEY=~ s/PATTERN/REPLACEMENT/ actions to rewrite
+the incoming search.
+
+Search rewriting is completely free-form, and it is possible to rewrite searches to a completely different Viper suffix, as long as both are located in the same base directory.
+
+This is a legitimate feature of the rewrite model, and is officially used to
+rewrite incoming DHCP search queries under ou=dhcp to appropriate places
+and with appropriate options under ou=clients.
+
+KEY can be one of base, scope, deref, size, time, filter, attrOnly. Rewriting
+one last element of a search, the list of attributes to return, is currently
+not possible, but the feature is on the way.
+
+Examples: production examples used in rewriting ou=dhcp to ou=clients
+
+```
+Example 1:
+
+# Solve lack of flexibility in ISC DHCP3 LDAP patch by
+# plainly specifying ldap-base-dn "ou=dhcp" in DHCP's
+# config, and then here, rewriting DHCP ethernet address
+# lookup to the ou=clients tree under which all clients
+# are defined.
+
+searchSubst  base        "^ou=dhcp$"                       \
+             filter      "^\\(&\\(objectClass=dhcpHost\\)\\(dhcpHWAddress=ethernet [\\dabcdef:]+\\)\\)$" \
+             -&gt;                                            \
+             base   .+   ou=clients
+
+
+Example 2:
+
+# Solve lack of flexibility in ISC DHCP3 LDAP patch by
+# rewriting a search in any shared network, tree
+# ou=dhcp, to a proper location,
+
+searchSubst  base        "^ou=\\w+,ou=dhcp$"                \
+             scope       "^1$"                             \
+             filter      "^\\(objectClass=\\*\\)$"         \
+             -&gt;                                            \
+             base   .+   "ou=clients"                      \
+             filter .+   "(&amp;(objectClass=dhcpSubnet)(!(cn=default)))" \
+             scope  .+   2
+```
+
 
 ## LDAP Operations - Notes
 
