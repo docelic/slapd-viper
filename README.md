@@ -79,7 +79,8 @@ The first four lines are required by `slapd` and its `back-perl` backend
 to configure the suffix and initialize Viper.
 
 The last two lines are required by the Viper backend. The value of
-`treesufix` must be equal to `suffix`. This small duplication cannot
+`treesufix` must be equal to `suffix`.
+This small duplication cannot
 be avoided because `suffix` directive is consumed by `slapd` and is not
 passed onto our backend.
 
@@ -145,6 +146,13 @@ the entry and everything under it in one go).
 
 See notes for DELETE under "LDAP Operations - Notes".
 
+##### enableBind 0|1
+
+Whether to allow binding as entries under this suffix. By default this
+is disabled.
+
+See notes for BIND under "LDAP Operations - Notes".
+
 ##### extension .ldif
 
 Specify file extension to use when storing server data on disk.
@@ -190,13 +198,17 @@ This is useful to enable to detect "no-op" modifications and
 avoid writing to disk, preserving meaningful modification timestamps
 on existing entries.
 
-##### parseVariables 1|0
+##### parse 1|0
 
 Specify whether in the lines that follow, variable and directive expansion
 should be performed.
 
 This includes expanding ${variable} to variable values and %{directive} to
 configuration directive values.
+
+##### reset
+
+Reset current stack in memory to empty list.
 
 ##### save FILE
 
@@ -237,6 +249,14 @@ have their schemas in sync.
 
 Example: `schemaLDIF /etc/ldap/schema/schema.ldif`
 
+##### treeSuffix SUFFIX
+
+This value should always match the value of `suffix` configured for the database.
+
+This small duplication cannot
+be avoided because `suffix` directive is consumed by `slapd` and is not
+passed onto our backend.
+
 ##### var VARIABLE "VALUE STRING"
 
 Assign "VALUE STRING" to variable VARIABLE. Variables, in this context,
@@ -244,6 +264,10 @@ are visible only within the suffix where they are defined, and their value
 is expanded with ${variable} if option "parseVariables" is enabled.
 
 #### Complex Configuration Directives
+
+##### addPrompt
+
+##### addRelocate
 
 ##### entryAppend ATTRIBUTE PATTERN ... -&gt; attr ATTRIBUTE [ATTRATTR [ATTR...]]
 ##### entryAppend ATTRIBUTE PATTERN ... -&gt; append PATTERN REPLACEMENT [ATTR...]
@@ -481,6 +505,6 @@ searchSubst  base        "^ou=\\w+,ou=dhcp$"                \
 
 ## LDAP Operations - Notes
 
-1. BIND operation is supported, but only in a trivial way. Therefore, binding using a DN under this part of DIT is not enabled by default unless `enable_bind 1` is present in the config file.
+1. BIND operation is supported, but only in a trivial way. Therefore, binding using a DN under this part of DIT is not encouraged nor enabled by default unless `enable_bind 1` is present in the config file. It is expected that users should authenticate using some other suffixes or via e.g. GSSAPI, so that this `bind()` is never called or needed.
 
 1. DELETE operation is supported, but does not receive an indication from OpenLDAP whether subtree delete was requested or not. Therefore, currently the way to control whether a DELETE will delete whole subtrees or refuse to work on non-leaf values is controlled using the config option `deleteTrees`.
