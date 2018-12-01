@@ -189,6 +189,7 @@ sub new {
 		schemafatal    => 0,       # Missing schema is fatal problem? (Allowed to be
 		                           #  missing by default so that you can run server,
 		                           #  get schema, save it and have it on next start)
+		enable_bind    => 0,       # Allow bind? Our implementation is minimal.
 
 		# Keys that control parsing behavior in slapd.conf and basically take
 		# effect directly when encountered.
@@ -218,8 +219,6 @@ sub new {
 		cacheread      => '',      # Num-ops cache validity (dn2leaf disk reads)
 
 		'start'        => [],      # Time of search start (array ID= search level)
-
-		'allow_bind'   => 0,       # Allow bind? (Our implementation is limited)
 	};
 
 	# Must be done here as schema parser already has to be present
@@ -336,7 +335,7 @@ sub init {
 sub bind {
 	my( $this, $dn, $pw)= @_;
 
-	return LDAP_UNWILLING_TO_PERFORM unless $this->{allow_bind};
+	return LDAP_UNWILLING_TO_PERFORM unless $this->{enable_bind};
 
 	$this->normalize( \$dn);
 
@@ -854,7 +853,7 @@ sub search {
 
 # Modifying existing entries
 sub modify {
-  my( $this, $dn, @list)= @_;
+	my( $this, $dn, @list)= @_;
 	my $ldif;
 
 	$this->setup_state( \@_);
