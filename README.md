@@ -63,32 +63,33 @@ Dynamic functions possible with `slapd-viper` are:
 
 ## Configuration Reference
 
-Each database configured to use Viper should begin with the following block:
+Each database backed by Viper should be configured with something similar to the following block in `slapd.conf`:
 
 ```
 database           perl
-suffix             "SUFFIX"
+suffix             "dc=example,dc=com"
 perlModulePath     "/etc/ldap/slapd-viper"
 perlModule         "Viper"
 
 directory          "/var/lib/ldap/viper/"
-treesuffix         "SUFFIX"
+treesuffix         "dc=example,dc=com"
 ```
 
-The first four lines are required by slapd and its back-perl backend
+The first four lines are required by `slapd` and its `back-perl` backend
 to configure the suffix and initialize Viper.
 
 The last two lines are required by the Viper backend. The value of
-`treesufix` must be equal to 'suffix'. (This small duplication cannot
+`treesufix` must be equal to `suffix`. This small duplication cannot
 be avoided because `suffix` directive is consumed by `slapd` and is not
-passed onto our backend).
+passed onto our backend.
+
+After the above standard lines, the following directives can be used:
 
 ### Directives
 
-After the above standard lines, the following directives can be used. The list is
-sorted alphabetically, with each caption specifying configuration directive
-name and its usage syntax. Where applicable, the first value listed
-indicates the default value.
+The list is sorted alphabetically, with each caption specifying configuration
+directive name and its usage syntax.
+Where applicable, the first value listed indicates the default value.
 
 #### addIgnoredups 0|1
 
@@ -97,7 +98,7 @@ without throwing LDAP_ALREADY_EXISTS error. Applicable if `addoverwrites` is 0.
 
 #### addOverwrites 0|1
 
-Specify whether LDAP ADD operation should overwrite existing entries,
+Specify whether LDAP ADD operation should overwrite existing entries
 without throwing LDAP_ALREADY_EXISTS error.
 
 #### cacheRead SPEC
@@ -108,7 +109,7 @@ implies no cache.
 SPEC can be a pure number (implies seconds), or a time specification such as 5s,
 10m, 2h, 2d, 1w for seconds, minutes, hours, days and weeks respectively.
 
-It can also be a number of value uses, such as 20u, and number of LDAP operations, 20o.
+It can also be a number of uses, such as 20u, and number of LDAP operations, such as 20o.
 ("Number of uses" is not a value directly known to the admin, and should rarely, if ever, be used.)
 
 Overall best value, one that minimizes or eliminates the risk of
@@ -120,8 +121,7 @@ uses-based methods of expiry do not work correctly when caching non-scalar
 values (such as multiple values for an attribute). It is therefore suggested
 to always use the number-of-operations cache (like 1o).
 
-CacheRead and 'overlayConfig' cache can be used separately, or together,
-amplifying the effect.
+`cacheRead` and `overlayConfig` cache can be used together, amplifying the effect.
 
 Example: `cacheRead 1o`
 
@@ -134,21 +134,18 @@ Invoke removal of all saved stack files from disk.
 Specify whether Viper should allow deleting non-leaf elements (deleting
 the entry and everything under it in one go).
 
-Whether subtree delete is requested or not can be controlled with
-ldapdelete option -r, but `back-perl` does not pass that option onto the
-backend, so the client-side option is not honored, and `deleteTrees` is the
-single decision maker.
+See notes for DELETE under "LDAP Operations - Notes".
 
-#### entryAppend ATTRIBUTE PATTERN -&gt; &lt;attr ATTRIBUTE [ATTRATTR [ATTR...]] | append PATTERN REPLACEMENT [ATTR...]&gt;
+#### entryAppend ATTRIBUTE PATTERN ... -&gt; attr ATTRIBUTE [ATTRATTR [ATTR...]]
+#### entryAppend ATTRIBUTE PATTERN ... -&gt; append PATTERN REPLACEMENT [ATTR...]
 
-Specify entryAppend rule, allowing adding extra attributes into an entry
+Specify an `entryAppend` rule, allowing adding extra attributes into an entry
 before returning it to the client.
 
-When all ATTRIBUTE PATTERN pairs match, Viper looks to append the entry with
+When all ATTRIBUTE-PATTERN pairs match, Viper looks to append the entry with
 a set of default attributes.
 
-The entry from which to read the default attributes to append can be specified in two
-ways.
+The entry from which to import the attributes can be specified in two ways:
 
 1. With "attr ATTRIBUTE" (usually "attr seeAlso"). In that case,
 the attribute `seeAlso` is looked up in the current entry. It is expected
@@ -173,16 +170,16 @@ Examples from production config:
 
 ```
 entryAppend  objectClass "^dhcpHost$"                      \
-             -&gt;                                            \
+             ->                                            \
              append .+ cn=dhcpHost,ou=objectClasses,ou=defaults
 
 entryAppend  objectClass "^dhcpSubnet$"                    \
-             -&gt;                                            \
+             ->                                            \
              append .+ cn=dhcpSubnet,ou=objectClasses,ou=defaults
 
 entryAppend  dn          "^cn=default,ou=networks"         \
              objectClass "^ipNetwork$"                     \
-             -&gt;                                            \
+             ->                                            \
              attr seeAlso
 ```
 
@@ -196,7 +193,7 @@ current or other entry.
 
 Example which always matches, and so enables the `exp` overlay: `exp  .   ^$`
 
-#### extension EXT
+#### extension .ldif
 
 Specify file extension to use when storing server data on disk.
 
@@ -206,8 +203,6 @@ Each file contains one LDAP entry in LDIF format.
 
 File extension must be specified to make directories distinguishable
 from files, and the default value should rarely be changed.
-
-Default: `.ldif`
 
 #### file MATCH_REGEX NON_MATCH_REGEX
 
@@ -238,21 +233,6 @@ Example: `find  .   ^$`
 
 Load and process configuration stack from FILE.
 FILE is always relative to suffix base directory.
-
-To ease writing slapd.conf configuration, Viper supports saving
-stacks of configuration values to disk.
-
-Once saved, the stack can be loaded by subsequently-defined suffixes to
-import configuration blocks.
-
-It is possible to specify a list of PATTERN/REPLACEMENTs that
-are applied to every line loaded before it is sent to the config
-processor.
-
-Also, stacks may contain variables that will expand to proper values
-in the context of each suffix that is using them.
-(Not particularly important, but note that this will happen in the
-config processor call, not during PATTERN/REPLACEMENT preprocessing.)
 
 Example: `load default_opts`
 
@@ -326,59 +306,33 @@ OPTION can be "cache", "prefix" or "if".
 Specify whether in the directives that follow, variable and directive expansion
 should be performed.
 
-
 This includes expanding ${variable} to variable values and %{directive} to
 configuration directive values.
-
 
 #### perl MATCH_REGEX NON_MATCH_REGEX
 
 Specify regexes that each entry DN must and must not match respectively, to have
 overlay "perl" run on its attributes.
 
-
 By default, Perl overlay is disabled as it is in fact an interface for
 "eval", and is considered dangerous. To activate it, open Viper.pm and
 enable constant PERLEVAL.
 
-
 Example: `perl  .   ^$`
-
 
 #### save FILE
 
 Save current stack to FILE, always relative to suffix base directory.
 
-
-To ease writing slapd.conf configuration, Viper supports saving
-stacks of configuration values to disk.
-
-
-Once saved, the stack can be loaded by subsequently-defined suffixes to
-import configuration blocks.
-
-
-Stacks may contain variables that expand to proper values in the context
-of each suffix that is using them.
-
-
-Stack and dump functions itself are not part of the stack, so they do
-not end up saved or loaded from stack files. They need to be specified
-explicitly in each suffix that wants to use them.
-
-
 Example: `save default_opts`
-
 
 #### searchFallback PATTERN REPLACEMENT
 
 Specify search fallback rule, effectively implementing default entries.
 
-
 When a specific search base is requested, and it does not exist in the searched
 location, it is possible to fallback to a chain of default entries. The first
 entry found wins.
-
 
 Examples: production examples defaulting to site-wide and global defaults
 
@@ -401,19 +355,15 @@ When the incoming search request matches all KEY PATTERN pairs, Viper
 performs the specified KEY=~ s/PATTERN/REPLACEMENT/ actions to rewrite
 the incoming search.
 
-
 Search rewriting is completely free-form, and it is possible to rewrite searches to a completely different Viper suffix, as long as both are located in the same base directory.
-
 
 This is a legitimate feature of the rewrite model, and is officially used to
 rewrite incoming DHCP search queries under ou=dhcp to appropriate places
 and with appropriate options under ou=clients.
 
-
 KEY can be one of base, scope, deref, size, time, filter, attrOnly. Rewriting
 one last element of a search, the list of attributes to return, is currently
 not possible, but the feature is on the way.
-
 
 Examples: production examples used in rewriting ou=dhcp to ou=clients
 
@@ -453,32 +403,26 @@ searchSubst  base        "^ou=\\w+,ou=dhcp$"                \
 Specify whether a missing or inaccessible schemaLDIF file should trigger
 a fatal error.
 
-
 It is vital for Viper to be aware of server's schema (which comes from
 the schemaLDIF file). The server surely won't work properly if the schema
 file in LDIF format is missing, or is not up to date with the server's schema.
-
 
 However, we issue a warning and allow startup without it, because you are
 then expected to use <i>scripts/schema.pl</i> to connect to the
 server right away and obtain the schema in LDIF format, saving it to the
 expected location. Then, restart the server to pick it up.
 
-
 The default setup as installed by <i>scripts/viper-setup.sh</i> includes
 all the schema files and the schema.ldif that is in sync with them, so
 it is not necessary to create or sync the file manually.
-
 
 SchemaFatal value should probably set to 1 only when you're sure you do
 have the schema.ldif file, and that its inexistence in your setup is a
 sure indication of an error.
 
-
 #### schemaLDIF FILE
 
 Specify location of server's schema in a single file, in LDIF format.
-
 
 Viper must be aware of server's schema, but back-perl does not pass that
 information onto the backend. The way to produce it then is to first run
@@ -486,17 +430,14 @@ the server without it, then use <i>scripts/schema.pl</i> to obtain the
 schema and save it to the expected location, then re-start the
 server with <i>invoke-rc.d slapd restart</i>.
 
-
 Directive "schemaFatal" specifies whether Viper should allow starting
 up without the schema LDIF file in place.
-
 
 Note that the schema in LDIF format does not eliminate the need to have the
 real schema files in /etc/ldap/schema/*.schema. Schema files are read by
 slapd, and schema LDIF file is read by Viper. LDIF is created on the 
 basis of real schema files, and at all times, slapd and Viper should
 have their schemas in sync.
-
 
 This means you need to sync schema LDIF file to the actual server's schema
 every
@@ -506,10 +447,7 @@ the server. Unless Viper schema is up to date, LDAP results may be be subtly
 incorrect and error basically impossible to trace (unless you remember it
 may be a stale schema file).
 
-
 Example: `schemaLDIF /etc/ldap/schema/schema.ldif`
-
-
 
 #### var VARIABLE "VALUE STRING"
 
@@ -517,31 +455,25 @@ Assign "VALUE STRING" to variable VARIABLE. Variables, in this context,
 are visible only within the suffix where they are defined, and their value
 is expanded with ${variable}, if option "parseVariables" is enabled.
 
-
 #### loadDump FILE
  THIS IS A DEBUG OPTION 
 
 Load direct Perl Storable dump of configuration hash from FILE, always
 relative to the suffix base directory.
 
-
 This is an advanced option that should not be called from slapd.conf.
-
 
 It is intended for scenarios where Viper is at least once initialized by slapd
 (and configured via slapd.conf), and config then dumped as Storable object
 using saveDump.
-
 
 After that, you can run Viper "standalone", directly under the Perl
 interpreter using <i>scripts/viper.pl</i>, and instead of re-parsing
 slapd.conf for configuration, simply send "loadDump FILE" to the config
 processor, to load the exact state as had by slapd/Viper.
 
-
 This is almost always needed only when you want to run Viper under the Perl
 interpreter directly, to specify Perl debug or profiling options.
-
 
 #### saveDump FILE
  THIS IS A DEBUG OPTION 
@@ -549,18 +481,14 @@ interpreter directly, to specify Perl debug or profiling options.
 Save direct Perl Storable dump of configuration hash to FILE, always
 relative to the suffix base directory.
 
-
 This is an advanced option that should usually be called as the last
 line of slapd.conf configuration for a particular suffix.
 
-
 This is almost always needed only when you want to run Viper under the Perl
 interpreter directly, to specify Perl debug or profiling options.
-
-
 
 ## LDAP Operations - Notes
 
 1. BIND operation is supported, but only in a trivial way. Therefore, binding using a DN under this part of DIT is not enabled by default unless `enable_bind 1` is present in the config file.
 
-1. DELETE operation works, but does not receive an indication whether subtree delete was requested or not. Therefore, currently the way to control whether a DELETE will delete whole subtrees or refuse to work on non-leaf values is controlled using the config option `deleteTrees`.
+1. DELETE operation is supported, but does not receive an indication from OpenLDAP whether subtree delete was requested or not. Therefore, currently the way to control whether a DELETE will delete whole subtrees or refuse to work on non-leaf values is controlled using the config option `deleteTrees`.
