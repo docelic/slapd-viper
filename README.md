@@ -35,7 +35,7 @@ ldapsearch -x -b dc=example,dc=com
 
 That's it for the most basic example.
 
-## Introduction
+## Overview
 
 `slapd-viper` is a custom backend for OpenLDAP built on top of OpenLDAP's `slapd-perl`.
 
@@ -85,59 +85,70 @@ passed onto our backend.
 
 After the above standard lines, the following directives can be used:
 
-### Directives
+### Configuration Directives
 
-The list is sorted alphabetically, with each caption specifying configuration
+The list is split into simple and complex directives, simple first.
+
+Within each group, the list is sorted alphabetically, with each heading specifying configuration
 directive name and its usage syntax.
+
 Where applicable, the first value listed indicates the default value.
 
-#### addIgnoredups 0|1
+#### Simple Directives
+
+##### addIgnoredups 0|1
 
 Specify whether LDAP ADD operation should ignore adds on existing entries
 without throwing LDAP_ALREADY_EXISTS error. Applicable if `addoverwrites` is 0.
 
-#### addOverwrites 0|1
+##### addOverwrites 0|1
 
 Specify whether LDAP ADD operation should overwrite existing entries
 without throwing LDAP_ALREADY_EXISTS error.
 
-#### cacheRead SPEC
+##### cacheRead SPEC
 
-Specify how (and how long) to cache LDIF reads from disk. No specification
-implies no cache.
+Specify how (and how long) to cache LDIF reads from disk. No specification implies no cache.
 
-SPEC can be a pure number (implies seconds), or a time specification such as 5s,
-10m, 2h, 2d, 1w for seconds, minutes, hours, days and weeks respectively.
+SPEC can be:
 
-It can also be a number of uses, such as 20u, and number of LDAP operations, such as 20o.
-("Number of uses" is not a value directly known to the admin, and should rarely, if ever, be used.)
+```
+Xo   - X LDAP operations. Recommended
 
-Overall best value, one that minimizes or eliminates the risk of
-serving stale data while still reaching a noticeable optimization
-(up to 25%), is 1 operation, specified as 1o.
+X    - implies X seconds. Not recommended for use
+Xs   - X seconds. Not recommended for use
+Xm   - X minutes. Not recommended for use
+Xh   - X hours. Not recommended for use
+Xd   - X days. Not recommended for use
+Xw   - X weeks. Not recommended for use
+Xu   - X uses. Not recommended for use
+```
+
+Overall best value, which minimizes risk of serving stale data while reaching
+noticeable optimization improvement (up to 25%), is 1 operation, specified as `1o`.
 
 NOTE: due to deficiencies in Memoize::Expire module, time- and
 uses-based methods of expiry do not work correctly when caching non-scalar
 values (such as multiple values for an attribute). It is therefore suggested
-to always use the number-of-operations cache (like 1o).
+to always use the number-of-operations cache.
 
 `cacheRead` and `overlayConfig` cache can be used together, amplifying the effect.
 
 Example: `cacheRead 1o`
 
-#### clean
+##### clean
 
 Invoke removal of all saved stack files from disk.
 
-#### deleteTrees 1|0
+##### deleteTrees 1|0
 
 Specify whether Viper should allow deleting non-leaf elements (deleting
 the entry and everything under it in one go).
 
 See notes for DELETE under "LDAP Operations - Notes".
 
-#### entryAppend ATTRIBUTE PATTERN ... -&gt; attr ATTRIBUTE [ATTRATTR [ATTR...]]
-#### entryAppend ATTRIBUTE PATTERN ... -&gt; append PATTERN REPLACEMENT [ATTR...]
+##### entryAppend ATTRIBUTE PATTERN ... -&gt; attr ATTRIBUTE [ATTRATTR [ATTR...]]
+##### entryAppend ATTRIBUTE PATTERN ... -&gt; append PATTERN REPLACEMENT [ATTR...]
 
 Specify an `entryAppend` rule, allowing adding extra attributes into an entry
 before returning it to the client.
@@ -183,7 +194,7 @@ entryAppend  dn          "^cn=default,ou=networks"         \
              attr seeAlso
 ```
 
-#### exp MATCH_REGEX NON_MATCH_REGEX
+##### exp MATCH_REGEX NON_MATCH_REGEX
 
 Specify regexes that each entry DN must and must not match respectively, to have
 overlay "exp" run on its attributes.
@@ -193,7 +204,7 @@ current or other entry.
 
 Example which always matches, and so enables the `exp` overlay: `exp  .   ^$`
 
-#### extension .ldif
+##### extension .ldif
 
 Specify file extension to use when storing server data on disk.
 
@@ -204,7 +215,7 @@ Each file contains one LDAP entry in LDIF format.
 File extension must be specified to make directories distinguishable
 from files, and the default value should rarely be changed.
 
-#### file MATCH_REGEX NON_MATCH_REGEX
+##### file MATCH_REGEX NON_MATCH_REGEX
 
 Specify regexes that each entry DN must and must not match respectively, to have
 overlay "file" run on its attributes.
@@ -214,7 +225,7 @@ relative to the suffix base directory.
 
 Example: `file  .   ^$`
 
-#### find MATCH_REGEX NON_MATCH_REGEX
+##### find MATCH_REGEX NON_MATCH_REGEX
 
 Specify regexes that each entry DN must and must not match respectively, to have
 overlay "find" run on its attributes.
@@ -229,28 +240,28 @@ a search to find them.
 
 Example: `find  .   ^$`
 
-#### load FILE [PATTERN REPLACEMENT ...]
+##### load FILE [PATTERN REPLACEMENT ...]
 
 Load and process configuration stack from FILE.
 FILE is always relative to suffix base directory.
 
 Example: `load default_opts`
 
-#### message TEXT
+##### message TEXT
 
 Print TEXT to the log. The log will be a console if slapd is started
 with option -d (such as -d 256) to run in the foreground.
 
 Example: `message Test`
 
-#### modifyCopyOnWrite 1|0
+##### modifyCopyOnWrite 1|0
 
 When a MODIFY request is issued for an entry that does not really exist 
 (i.e. it comes from a fallback), specify whether Viper should copy the
 entry to the expected location and then modify it, or return
 LDAP_NO_SUCH_OBJECT.
 
-#### modifySmarts 1|0
+##### modifySmarts 1|0
 
 Specify whether Viper should ignore MODIFY requests that do not result
 in any real change within the entry.
@@ -266,7 +277,7 @@ relevance.
 However, it is still useful to enable it, detect "no-op" modifications and
 avoid writing to disk, preserving meaningful modification timestamps.
 
-#### overlayConfig OVERLAY OPTION VALUE ...
+##### overlayConfig OVERLAY OPTION VALUE ...
 
 Specify default overlay options.
 
@@ -301,7 +312,7 @@ OPTION can be "cache", "prefix" or "if".
 
 	Example: prefix subdir/
 
-#### parseVariables 1|0
+##### parseVariables 1|0
 
 Specify whether in the directives that follow, variable and directive expansion
 should be performed.
@@ -309,7 +320,7 @@ should be performed.
 This includes expanding ${variable} to variable values and %{directive} to
 configuration directive values.
 
-#### perl MATCH_REGEX NON_MATCH_REGEX
+##### perl MATCH_REGEX NON_MATCH_REGEX
 
 Specify regexes that each entry DN must and must not match respectively, to have
 overlay "perl" run on its attributes.
@@ -320,13 +331,13 @@ enable constant PERLEVAL.
 
 Example: `perl  .   ^$`
 
-#### save FILE
+##### save FILE
 
 Save current stack to FILE, always relative to suffix base directory.
 
 Example: `save default_opts`
 
-#### searchFallback PATTERN REPLACEMENT
+##### searchFallback PATTERN REPLACEMENT
 
 Specify search fallback rule, effectively implementing default entries.
 
@@ -346,7 +357,7 @@ searchFallback  cn=.[^,\\s]+,ou=hosts,.+      ou=hosts,ou=defaults
 searchFallback  cn=.[^,\\s]+,ou=templates,.+  ou=templates,ou=defaults
 ```
 
-#### searchSubst KEY PATTERN ... -&gt; KEY PATTERN REPLACEMENT ...
+##### searchSubst KEY PATTERN ... -&gt; KEY PATTERN REPLACEMENT ...
 
 Specify searchSubst rule, allowing rewrite of any part of the search
 request.
@@ -398,7 +409,7 @@ searchSubst  base        "^ou=\\w+,ou=dhcp$"                \
 ```
 
 
-#### schemaFatal 0|1
+##### schemaFatal 0|1
 
 Specify whether a missing or inaccessible schemaLDIF file should trigger
 a fatal error.
@@ -420,7 +431,7 @@ SchemaFatal value should probably set to 1 only when you're sure you do
 have the schema.ldif file, and that its inexistence in your setup is a
 sure indication of an error.
 
-#### schemaLDIF FILE
+##### schemaLDIF FILE
 
 Specify location of server's schema in a single file, in LDIF format.
 
@@ -449,13 +460,13 @@ may be a stale schema file).
 
 Example: `schemaLDIF /etc/ldap/schema/schema.ldif`
 
-#### var VARIABLE "VALUE STRING"
+##### var VARIABLE "VALUE STRING"
 
 Assign "VALUE STRING" to variable VARIABLE. Variables, in this context,
 are visible only within the suffix where they are defined, and their value
 is expanded with ${variable}, if option "parseVariables" is enabled.
 
-#### loadDump FILE
+##### loadDump FILE
  THIS IS A DEBUG OPTION 
 
 Load direct Perl Storable dump of configuration hash from FILE, always
@@ -475,7 +486,7 @@ processor, to load the exact state as had by slapd/Viper.
 This is almost always needed only when you want to run Viper under the Perl
 interpreter directly, to specify Perl debug or profiling options.
 
-#### saveDump FILE
+##### saveDump FILE
  THIS IS A DEBUG OPTION 
 
 Save direct Perl Storable dump of configuration hash to FILE, always
