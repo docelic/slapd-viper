@@ -1,47 +1,44 @@
-#!/usr/bin/perl
-#
-# SPINLOCK - Advanced GNU/Linux networks in commercial and education sectors.
-#
-# Copyright 2008-2009 SPINLOCK d.o.o., http://www.spinlocksolutions.com/
-#                     Davor Ocelic, docelic@spinlocksolutions.com
-#
-# http://www.spinlocksolutions.com/
-# http://techpubs.spinlocksolutions.com/
-#
-# Released under GPL v3 or later.
-#
-#
-# Script reads in LDIF file and briefly prints contained DNs.
-# Very simple script, used for detecting any syntactical errors
-# in LDIFs.
-#
-# read-ldif <ldif-file>
-#
-# Optionally, entry dump can be displayed if invoked appropriately.
-#
-# read-ldif <ldif-file> verbose
+#!/usr/bin/env perl
+use warnings;
+use strict;
 
-use Net::LDAP::LDIF;
-use Data::Dumper;
+# Script reads an LDIF file and briefly prints contained DNs.
+# Offline script, used for detecting any syntactical errors
+# in specified LDIFs.
+#
+# ./read-ldif.pl <ldif-file>
+#
+# Optionally, entry dump can be displayed:
+#
+# ./read-ldif.pl -v <ldif-file>
+#
+# Davor Ocelic <docelic@crystallabs.io>
+# Crystal Labs, https://crystallabs.io/
+# Released under GPL v3.
 
-$ldif = Net::LDAP::LDIF->new(
+use Data::Dumper qw/Dumper/;
+use Net::LDAP::LDIF qw//;
+
+my $ldif = Net::LDAP::LDIF->new(
 	$ARGV[0], "r",
-	onerror => 'undef', # warn, die
-	);
+	onerror => 'undef' # warn, die
+);
 
-$verbose= $ARGV[1];
+my $verbose = 0;
+if($ARGV[0] eq '-v') {
+  shift;
+  $verbose = 1
+}
 
-while( not $ldif->eof ( ) ) {
-	$entry = $ldif->read_entry ( );
+while(!$ldif->eof) {
+	my $entry = $ldif->read_entry;
 
-	if ( $ldif->error ( ) ) {
-		print "Error msg: ", $ldif->error ( ), "\n";
-		print "Error lines:\n", $ldif->error_lines ( ), "\n";
+	if($ldif->error) {
+		print "Error msg: ", $ldif->error, "\n";
+		print "Error lines:\n", $ldif->error_lines, "\n"
 	} else {
-
 		print $entry. ' | '. $entry->dn. "\n";
-		print Dumper \$entry if $verbose;
+		print Dumper \$entry if $verbose
 	}
 }
-$ldif->done;
-
+$ldif->done

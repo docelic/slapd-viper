@@ -1,26 +1,26 @@
-#!/usr/bin/perl
-#
-# sprofpp, simple script, akin to the standard dprofpp, sorts
-# and displays Devel::SmallProf output on total time used field
-# (or any other numeric field).
-#
-# Usage: perl -d:SmallProf scripts/standalone.pl  (to generate smallprof.out)
-#        perl scripts/sprofpp [FILE] [SORT FIELD] (to print out statistics)
-#
-# By default, FILE is smallprof.out, FIELD is 2 (wallclock time).
-#
-#
-# SPINLOCK - Advanced GNU/Linux networks in commercial and education sectors
-#
-# Copyright 2009 SPINLOCK d.o.o., http://www.spinlocksolutions.com/
-#                Davor Ocelic, docelic@spinlocksolutions.com
-#
-# http://www.spinlocksolutions.com/
-# http://techpubs.spinlocksolutions.com/
-#
-# Released under GPL v3 or later.
-#
+#!/usr/bin/env perl
 
+# sprofpp - a simple script akin to the standard dprofpp.
+# It sorts and displays Devel::SmallProf output on 'total time used' field,
+# or any other numeric field.
+#
+# Usage:
+# First, generate smallprof.out:
+# perl -I. -d:SmallProf scripts/viper.pl
+#
+# Then, print statistics based on it:
+# (By default, FILE is smallprof.out, and FIELD is 2 (wallclock time)):
+# perl scripts/sprofpp [FILE] [SORT_FIELD_NUMBER]
+#
+# Alternatively, you can use DProf and its existing dprofpp:
+# perl -I. -d:DProf scripts/viper.pl
+# dprofpp
+#
+# Davor Ocelic <docelic@crystallabs.io>
+# Crystal Labs, https://crystallabs.io/
+# Released under GPL v3.
+
+use warnings;
 use strict;
 use Fatal qw/open/;
 
@@ -38,4 +38,3 @@ my @sorted = sort {
 close $prof;
 
 print join '', @sorted;
-

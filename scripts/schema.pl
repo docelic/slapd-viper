@@ -1,40 +1,37 @@
-#!/usr/bin/perl
-#
-# SPINLOCK - Advanced GNU/Linux networks in commercial and education sectors.
-#
-# Copyright 2008-2009 SPINLOCK d.o.o., http://www.spinlocksolutions.com/
-#                     Davor Ocelic, docelic@spinlocksolutions.com
-#
-# http://www.spinlocksolutions.com/
-# http://techpubs.spinlocksolutions.com/
-#
-# Released under GPL v3 or later.
-#
-#
+#!/usr/bin/env perl
+use warnings;
+use strict;
+
 # Tool to retrieve schema from server in LDIF format.
-# Needed so that it can be loaded into Viper, so that Viper becomes
-# aware of server's schema through schemaLDIF config option.
 #
-# This is just a basic script that assumes unauthenticated schema
-# retrieve will work.
+# This is just a basic script that assumes unauthenticated or
+# pre-authenticated schema retrieval will work.
 #
-# perl schema.pl [hostname]
+# Apart from its standalone use, this is also useful/needed with
+# the Viper backend because slapd does not provide slapd-perl with
+# access to the schema.
+#
+# So, after starting the LDAP server, this script is run to download
+# schema into a file, and then Viper's option "schemaLDIF" can find
+# and load it, and thus become aware of schema.
+#
+# ./schema.pl [hostname]
 #
 # Example:
 #
-# sudo sh -c 'perl scripts/schema.pl  > configs/schema.ldif'
-
-use warnings;
-use strict;
+# sudo sh -c './scripts/schema.pl > /etc/ldap/slapd-viper/schema.ldif'
+#
+# Davor Ocelic <docelic@crystallabs.io>
+# Crystal Labs, https://crystallabs.io/
+# Released under GPL v3.
 
 use Net::LDAP qw//;
 use Net::LDAP::Schema qw//;
 
-my $server= $ARGV[0]|| 'localhost';
+my $server= $ARGV[0]|| '0';
 
-my $ldap = Net::LDAP->new ( $server) or die "$@\n";
+my $ldap = Net::LDAP->new ($server) or die "$@\n";
 $ldap->bind or die "Can't bind\n";
 
 my $schema = $ldap->schema or die "Can't get schema\n";
-$schema->dump;
-
+$schema->dump
