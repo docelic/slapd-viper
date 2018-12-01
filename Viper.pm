@@ -55,7 +55,7 @@ use constant APPENDER => 1; # Enable appending with other entries' attributes.
 use constant FILEVAL  => 1; # Enable value expansion by reading files.
 use constant EXPANDVAL=> 1; # Enable value expansion by loading DN attrs.
 use constant FINDVAL  => 1; # Enable re-searching and returning certain attr.
-use constant PERLEVAL => 1; # Enable Perl evaluation of values.
+use constant PERLEVAL => 0; # Enable Perl evaluation of values.
 
 use constant RELOCATOR=> 0; # Enable relocation of Debconf keys from client.
 use constant PROMPTER => 0; # Enable relocation of Debconf keys from server.
@@ -166,7 +166,7 @@ sub new {
 		modifysmarts   => 1,       # Allow MODIFY to detect no-change
 		modifycopyonwrite=> 1,     # Modify & copy dfl entry to new DN if !exist?
 
-		deletetrees    => 1,       # DELETE allows deleting of non-leafs?
+		deletetrees    => 0,       # DELETE allows deleting of non-leafs?
 
 		searchsubst    => [],      # List of [...->...] search subst rules
 		searchfallback => [],      # List of [$a,$b] for $dn or $dn=~ s/$a/$b/
@@ -189,7 +189,7 @@ sub new {
 		schemafatal    => 0,       # Missing schema is fatal problem? (Allowed to be
 		                           #  missing by default so that you can run server,
 		                           #  get schema, save it and have it on next start)
-		enable_bind    => 0,       # Allow bind? Our implementation is minimal.
+		enablebind     => 0,       # Allow bind? Our implementation is minimal.
 
 		# Keys that control parsing behavior in slapd.conf and basically take
 		# effect directly when encountered.
@@ -335,7 +335,7 @@ sub init {
 sub bind {
 	my( $this, $dn, $pw)= @_;
 
-	return LDAP_UNWILLING_TO_PERFORM unless $this->{enable_bind};
+	return LDAP_UNWILLING_TO_PERFORM unless $this->{enablebind};
 
 	$this->normalize( \$dn);
 

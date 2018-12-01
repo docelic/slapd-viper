@@ -139,7 +139,7 @@ to always use the number-of-operations cache.
 
 Invoke removal of all saved stack files from disk.
 
-##### deleteTrees 1|0
+##### deleteTrees 0|1
 
 Specify whether Viper should allow deleting non-leaf elements (deleting
 the entry and everything under it in one go).
@@ -244,8 +244,8 @@ See the previous option for more info.
 Note that the schema in LDIF format does not eliminate the need to have the
 real schema files in `/etc/ldap/schema/*.schema`. Schema files are read by
 slapd, and schema LDIF file is read by Viper. LDIF is created on the 
-basis of real schema files, and at all times, slapd and Viper should
-have their schemas in sync.
+basis of real schema files, and at all times, Viper's LDIF schema should
+be in sync with slapd.
 
 Example: `schemaLDIF /etc/ldap/schema/schema.ldif`
 
@@ -261,7 +261,7 @@ passed onto our backend.
 
 Assign "VALUE STRING" to variable VARIABLE. Variables, in this context,
 are visible only within the suffix where they are defined, and their value
-is expanded with ${variable} if option "parseVariables" is enabled.
+is expanded with ${variable} if option "parse" is enabled.
 
 #### Complex Configuration Directives
 
